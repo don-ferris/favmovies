@@ -1,5 +1,5 @@
 #!/bin/bash
-wget -c https://lax5-4.download.real-debrid.com/d/GJCJXYZSWDGOQ93/I%20Robot.2004.4K.HDR.2160p.WEBDL%20Ita%20Eng%20x265-NAHOM.mkv
+wget -c https://lax4-4.download.real-debrid.com/d/HQHF7H2URP7T621/As.Good.as.It.Gets.1997.2160p.UHD.BluRay.x265.10bit.HDR.DDP5.1-RARBG.mkv
 
 
 #   4K|2160|UHD 10bit|10-bit|hdr blu|bd atmos|dts-x
