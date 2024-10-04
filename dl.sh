@@ -5,7 +5,8 @@ INPUT_FILE="./gimme/gimme.list"
 SYNC_SCRIPT="./gimme/sync.sh"
 LOG_FILE="./gimme/gimme.log"
 TEMP_FILE="./gimme/gimme.tmp"
-MAX_CONCURRENT_DOWNLOADS=5  # Maximum number of concurrent downloads
+OUTDIR="./_new"  # Output directory for downloads
+MAX_CONCURRENT_DOWNLOADS=4  # Maximum number of concurrent downloads
 SYNC_PAUSE=30  # Pause duration in seconds before each download
 
 # Function to run the sync script before each download
@@ -32,7 +33,7 @@ log_error() {
     fi
 }
 
-# Function to download a file using wget and then remove it from the list
+# Function to download a file using wget to the specified OUTDIR and then remove it from the list
 download_file() {
     local url="$1"
 
@@ -45,8 +46,8 @@ download_file() {
     # Pause before starting the download
     sleep "$SYNC_PAUSE"
 
-    # Download using wget with the -c flag for resuming downloads and visible progress
-    if wget -c "$url"; then
+    # Download using wget with the -c flag for resuming downloads and set the output directory
+    if wget -c -P "$OUTDIR" "$url"; then
         # Remove the successfully downloaded URL from the original file
         if ! sed -i "\|^$url\$|d" "$INPUT_FILE"; then
             log_error "Error: Failed to remove URL from the list: $url"
@@ -65,6 +66,9 @@ download_files_concurrently_with_xargs() {
         return 1
     fi
 
+    # Check if the output directory exists, if not create it
+    mkdir -p "$OUTDIR"
+
     # Filter URLs starting with 'http' and pass them to xargs for concurrent downloading
     grep -E '^http' "$INPUT_FILE" | xargs -n 1 -P "$MAX_CONCURRENT_DOWNLOADS" -I {} bash -c 'download_file "$@"' _ {}
 }
@@ -78,7 +82,7 @@ main() {
 
     # Export functions and variables to be used by xargs
     export -f run_sync_script log_error download_file
-    export INPUT_FILE LOG_FILE TEMP_FILE SYNC_PAUSE SYNC_SCRIPT
+    export INPUT_FILE LOG_FILE TEMP_FILE SYNC_PAUSE SYNC_SCRIPT OUTDIR
 
     # Download the files concurrently using xargs with visible progress output
     download_files_concurrently_with_xargs
