@@ -5,8 +5,8 @@ INPUT_FILE="./gimme/gimme.list"
 SYNC_SCRIPT="./gimme/sync.sh"
 LOG_FILE="./gimme/gimme.log"
 TEMP_FILE="./gimme/gimme.tmp"
-OUTDIR="./_new"  # Output directory for downloads
-MAX_CONCURRENT_DOWNLOADS=4  # Maximum number of concurrent downloads
+OUTDIR="./gimme/downloads"  # Output directory for downloads
+MAX_CONCURRENT_DOWNLOADS=5  # Maximum number of concurrent downloads
 SYNC_PAUSE=30  # Pause duration in seconds before each download
 
 # Function to run the sync script before each download
@@ -69,9 +69,24 @@ download_files_concurrently_with_xargs() {
     # Check if the output directory exists, if not create it
     mkdir -p "$OUTDIR"
 
-    # Export functions and variables to be used by xargs
+    # Export necessary environment variables and functions for xargs to use
     export -f run_sync_script log_error download_file
     export INPUT_FILE LOG_FILE TEMP_FILE SYNC_PAUSE SYNC_SCRIPT OUTDIR
 
-    # Export necessary environment variables for xargs to use
-    export INPUT_FILE LOG_FILE
+    # Use xargs to pass URLs and execute download_file concurrently
+    grep -E '^http' "$INPUT_FILE" | xargs -n 1 -P "$MAX_CONCURRENT_DOWNLOADS" -I {} bash -c 'download_file "{}"'
+}
+
+# Main function to encapsulate the script logic
+main() {
+    # Initialize the log file if it doesn't exist
+    if [[ ! -f "$LOG_FILE" ]]; then
+        touch "$LOG_FILE"
+    fi
+
+    # Download the files concurrently using xargs with visible progress output
+    download_files_concurrently_with_xargs
+}
+
+# Execute the main function
+main
