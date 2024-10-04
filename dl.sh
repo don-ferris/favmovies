@@ -4,23 +4,31 @@
 INPUT_FILE="./gimme/gimme.list"
 SYNC_SCRIPT="./gimme/sync.sh"
 LOG_FILE="./gimme/gimme.log"
-TEMP_FILE="./gimme/gimme.tmp"
 OUTDIR="./gimme/downloads"  # Output directory for downloads
 MAX_CONCURRENT_DOWNLOADS=5  # Maximum number of concurrent downloads
 SYNC_PAUSE=30  # Pause duration in seconds before each download
 
 # Function to run the sync script before each download
 run_sync_script() {
+    local sync_dir
+    sync_dir=$(dirname "$SYNC_SCRIPT")  # Get the directory of the sync script
+
+    # Ensure the sync script is executable and the working directory is correct
     if [[ ! -x "$SYNC_SCRIPT" ]]; then
         printf "Error: Sync script '%s' does not exist or is not executable.\n" "$SYNC_SCRIPT" >&2
         return 1
     fi
 
-    # Execute the sync script
-    if ! "$SYNC_SCRIPT"; then
-        printf "Error: Failed to execute the sync script.\n" >&2
-        return 1
-    fi
+    # Change to the directory of the sync script and execute it
+    (
+        cd "$sync_dir" || { printf "Error: Failed to change directory to '%s'.\n" "$sync_dir" >&2; return 1; }
+
+        # Execute the sync script and capture its output
+        if ! ./sync.sh; then
+            printf "Error: Failed to execute the sync script.\n" >&2
+            return 1
+        fi
+    )
 }
 
 # Function to log errors to gimme.log, prepending them to the top
@@ -28,7 +36,7 @@ log_error() {
     local message="$1"
 
     # Prepend the message to the log file
-    if ! printf "%s\n" "$message" | cat - "$LOG_FILE" > "$TEMP_FILE" && mv "$TEMP_FILE" "$LOG_FILE"; then
+    if ! printf "%s\n" "$message" | cat - "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"; then
         printf "Error: Failed to write to log file '%s'.\n" "$LOG_FILE" >&2
     fi
 }
@@ -38,6 +46,7 @@ download_file() {
     local url="$1"
 
     # Run the sync script before downloading
+    printf "Running sync before downloading: %s\n" "$url"
     if ! run_sync_script; then
         log_error "Error: Failed to run sync script before downloading URL: $url"
         return
@@ -71,7 +80,7 @@ download_files_concurrently_with_xargs() {
 
     # Export necessary environment variables and functions for xargs to use
     export -f run_sync_script log_error download_file
-    export INPUT_FILE LOG_FILE TEMP_FILE SYNC_PAUSE SYNC_SCRIPT OUTDIR
+    export INPUT_FILE LOG_FILE OUTDIR SYNC_SCRIPT SYNC_PAUSE
 
     # Use xargs to pass URLs and execute download_file concurrently
     grep -E '^http' "$INPUT_FILE" | xargs -n 1 -P "$MAX_CONCURRENT_DOWNLOADS" -I {} bash -c 'download_file "{}"'
