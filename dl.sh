@@ -4,41 +4,23 @@
 INPUT_FILE="./gimme/gimme.list"
 SYNC_SCRIPT="./gimme/sync.sh"
 LOG_FILE="./gimme/gimme.log"
+TEMP_FILE="./gimme/gimme.tmp"
 OUTDIR="./gimme/downloads"  # Output directory for downloads
 MAX_CONCURRENT_DOWNLOADS=5  # Maximum number of concurrent downloads
 SYNC_PAUSE=30  # Pause duration in seconds before each download
 
 # Function to run the sync script before each download
 run_sync_script() {
-    local sync_dir
-    sync_dir=$(dirname "$SYNC_SCRIPT")  # Get the directory of the sync script
-
-    # Ensure the sync script is executable and the working directory is correct
     if [[ ! -x "$SYNC_SCRIPT" ]]; then
         printf "Error: Sync script '%s' does not exist or is not executable.\n" "$SYNC_SCRIPT" >&2
         return 1
     fi
 
-    # Change to the directory of the sync script and execute it
-    (
-        cd "$sync_dir" || { printf "Error: Failed to change directory to '%s'.\n" "$sync_dir" >&2; return 1; }
-
-        # Enable command tracing for debugging the sync process
-        set -x
-        # Execute the sync script and capture its return code
-        ./sync.sh
-        local sync_exit_code=$?
-        set +x
-
-        # Treat exit code 1 as a successful outcome (e.g., no changes needed)
-        if [[ $sync_exit_code -eq 0 || $sync_exit_code -eq 1 ]]; then
-            printf "Sync script executed successfully. Exit code: %d\n" "$sync_exit_code"
-            return 0
-        else
-            printf "Error: Sync script returned a non-zero exit code: %d\n" "$sync_exit_code" >&2
-            return 1
-        fi
-    )
+    # Execute the sync script
+    if ! "$SYNC_SCRIPT"; then
+        printf "Error: Failed to execute the sync script.\n" >&2
+        return 1
+    fi
 }
 
 # Function to log errors to gimme.log, prepending them to the top
@@ -46,17 +28,19 @@ log_error() {
     local message="$1"
 
     # Prepend the message to the log file
-    if ! printf "%s\n" "$message" | cat - "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"; then
+    if ! printf "%s\n" "$message" | cat - "$LOG_FILE" > "$TEMP_FILE" && mv "$TEMP_FILE" "$LOG_FILE"; then
         printf "Error: Failed to write to log file '%s'.\n" "$LOG_FILE" >&2
     fi
 }
 
-# Function to download a file using wget to the specified OUTDIR and then remove it from the list
+# Function to download a file using wget and then remove it from the list
 download_file() {
     local url="$1"
 
+    # Ensure the output directory exists
+    mkdir -p "$OUTDIR"
+
     # Run the sync script before downloading
-    printf "Running sync before downloading: %s\n" "$url"
     if ! run_sync_script; then
         log_error "Error: Failed to run sync script before downloading URL: $url"
         return
@@ -77,23 +61,45 @@ download_file() {
     fi
 }
 
-# Function to download files concurrently with visible output using xargs
-download_files_concurrently_with_xargs() {
+# Function to download files concurrently
+download_files_concurrently() {
+    local url
+    local -a pids=()
+    local num_downloads=0
+
     # Check if the input file exists
     if [[ ! -f "$INPUT_FILE" ]]; then
         printf "Error: File '%s' does not exist.\n" "$INPUT_FILE" >&2
         return 1
     fi
 
-    # Check if the output directory exists, if not create it
-    mkdir -p "$OUTDIR"
+    # Create a temporary file to hold remaining URLs
+    cp "$INPUT_FILE" "$TEMP_FILE"
 
-    # Export necessary environment variables and functions for xargs to use
-    export -f run_sync_script log_error download_file
-    export INPUT_FILE LOG_FILE OUTDIR SYNC_SCRIPT SYNC_PAUSE
+    # Read the temporary file line by line
+    while IFS= read -r url; do
+        # Check if the line starts with 'http'
+        if [[ "$url" =~ ^http ]]; then
+            # Start the download in the background
+            download_file "$url" &
+            pids+=($!)
 
-    # Use xargs to pass URLs and execute download_file concurrently
-    grep -E '^http' "$INPUT_FILE" | xargs -n 1 -P "$MAX_CONCURRENT_DOWNLOADS" -I {} bash -c 'download_file "{}"'
+            # Increment the download counter
+            ((num_downloads++))
+
+            # If the number of concurrent downloads reaches the limit, wait for at least one to complete
+            if (( num_downloads >= MAX_CONCURRENT_DOWNLOADS )); then
+                wait -n  # Wait for at least one background job to finish
+                num_downloads=$((num_downloads - 1))  # Decrease counter after one completes
+            fi
+        fi
+    done < "$TEMP_FILE"
+
+    # Wait for any remaining background downloads to complete
+    wait
+
+    # Cleanup temporary file
+    rm -f "$TEMP_FILE"
 }
 
 # Main function to encapsulate the script logic
@@ -103,8 +109,8 @@ main() {
         touch "$LOG_FILE"
     fi
 
-    # Download the files concurrently using xargs with visible progress output
-    download_files_concurrently_with_xargs
+    # Download the files concurrently after synchronization
+    download_files_concurrently
 }
 
 # Execute the main function
