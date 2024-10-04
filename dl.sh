@@ -30,8 +30,11 @@ run_sync_script() {
         local sync_exit_code=$?
         set +x
 
-        # Check the return code and decide the outcome
-        if [[ $sync_exit_code -ne 0 ]]; then
+        # Treat exit code 1 as a successful outcome (e.g., no changes needed)
+        if [[ $sync_exit_code -eq 0 || $sync_exit_code -eq 1 ]]; then
+            printf "Sync script executed successfully. Exit code: %d\n" "$sync_exit_code"
+            return 0
+        else
             printf "Error: Sync script returned a non-zero exit code: %d\n" "$sync_exit_code" >&2
             return 1
         fi
