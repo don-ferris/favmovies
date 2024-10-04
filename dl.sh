@@ -69,24 +69,9 @@ download_files_concurrently_with_xargs() {
     # Check if the output directory exists, if not create it
     mkdir -p "$OUTDIR"
 
-    # Filter URLs starting with 'http' and pass them to xargs for concurrent downloading
-    grep -E '^http' "$INPUT_FILE" | xargs -n 1 -P "$MAX_CONCURRENT_DOWNLOADS" -I {} bash -c 'download_file "$@"' _ {}
-}
-
-# Main function to encapsulate the script logic
-main() {
-    # Initialize the log file if it doesn't exist
-    if [[ ! -f "$LOG_FILE" ]]; then
-        touch "$LOG_FILE"
-    fi
-
     # Export functions and variables to be used by xargs
     export -f run_sync_script log_error download_file
     export INPUT_FILE LOG_FILE TEMP_FILE SYNC_PAUSE SYNC_SCRIPT OUTDIR
 
-    # Download the files concurrently using xargs with visible progress output
-    download_files_concurrently_with_xargs
-}
-
-# Execute the main function
-main
+    # Export necessary environment variables for xargs to use
+    export INPUT_FILE LOG_FILE
