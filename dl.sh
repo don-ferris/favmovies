@@ -23,9 +23,16 @@ run_sync_script() {
     (
         cd "$sync_dir" || { printf "Error: Failed to change directory to '%s'.\n" "$sync_dir" >&2; return 1; }
 
-        # Execute the sync script and capture its output
-        if ! ./sync.sh; then
-            printf "Error: Failed to execute the sync script.\n" >&2
+        # Enable command tracing for debugging the sync process
+        set -x
+        # Execute the sync script and capture its return code
+        ./sync.sh
+        local sync_exit_code=$?
+        set +x
+
+        # Check the return code and decide the outcome
+        if [[ $sync_exit_code -ne 0 ]]; then
+            printf "Error: Sync script returned a non-zero exit code: %d\n" "$sync_exit_code" >&2
             return 1
         fi
     )
