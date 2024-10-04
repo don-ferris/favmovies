@@ -4,8 +4,8 @@
 INPUT_FILE="./gimme/gimme.list"
 SYNC_SCRIPT="./gimme/sync.sh"
 LOG_FILE="./gimme/gimme.log"
-OUTDIR="./gimme/downloads"  # Output directory for downloads
-MAX_CONCURRENT_DOWNLOADS=5  # Maximum number of concurrent downloads
+OUTDIR="./_new"  # Output directory for downloads
+MAX_CONCURRENT_DOWNLOADS=4  # Maximum number of concurrent downloads
 SYNC_PAUSE=30  # Pause duration in seconds before each download
 
 # Function to log errors to gimme.log, prepending them to the top
