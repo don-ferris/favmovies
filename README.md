@@ -1,5 +1,5 @@
 # favmovies
 
-A repo for movies and TV shows I like. See movies.txt and tvshows.txt
+A repo for movies and TV shows I like. See movies.list and tv.list
 
-Stranger Than Fiction (1994)
+ghp_0a6v8fgzcaaVFo2FJT1 DAXbi1yXWto1KMPaV
